@@ -1,35 +1,17 @@
 process_data_with_params <- function (input) {
-
-  start_date <- input$start_date
-  end_date <- input$end_date
-  time_unit <- input$time_unit
-  group_name <- input$group_name_single
-  group_name_compare_1 <- input$group_name_compare_1
-  group_name_compare_2 <- input$group_name_compare_2
   
-  print(input)
+  params <- list(
+    startDate = as.character(input$date_range[1]),
+    endDate = as.character(input$date_range[2]),
+    timeUnit = input$time_unit,
+    keywordGroups = list(list(
+      groupName = input$keyword,
+      keywords = list(input$keyword)
+    ))
+  )
   
-  params <-
-    list(
-      start_date = start_date,
-      end_date = end_date,
-      time_unit = time_unit,
-      group_name = group_name,
-      group_name_compare_1 = group_name_compare_1,
-      group_name_compare_2 = group_name_compare_2
-    )
-  
-  if (input$device == "pc") {
-    params$device <- "pc"
-  } else if (input$device == "mo") {
-    params$device <- "mo"
-  }
-  
-  if (input$gender == "남성") {
-    params$gender <- "m"
-  } else if (input$gender == "여성") {
-    params$gender <- "f"
-  }
+  params$device <- if (input$device != "전체") ifelse(input$device == "pc", "pc", "mo")
+  params$gender <- if (input$gender != "전체") ifelse(input$gender == "남성", "m", "f")
   
   if (input$ages == "미성년") {
     params$ages <- list("1", "2")
@@ -44,5 +26,7 @@ process_data_with_params <- function (input) {
   } else if (input$ages == "60대 이상") {
     params$ages <- list("11")
   }
-  return(params)
+  
+  jsonData <- toJSON(params, auto_unbox = TRUE)
+  return(jsonData)
 }

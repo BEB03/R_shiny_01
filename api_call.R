@@ -1,9 +1,3 @@
-# install.packages("httr")
-# install.packages("dotenv")
-
-library(httr)
-library(dotenv)
-
 dotenv::load_dot_env()
 
 client_id <- Sys.getenv("CLIENT_ID")
@@ -14,7 +8,6 @@ headers <- c("X-Naver-Client-Id" = client_id,
 
 send_post_request <- function(jsonData) {
   url <- "https://openapi.naver.com/v1/datalab/search"
-  headers <- headers
   response <-
     POST(url, add_headers(.headers = headers), body = jsonData)
   content <- content(response, "text")

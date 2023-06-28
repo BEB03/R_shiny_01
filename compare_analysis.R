@@ -1,7 +1,3 @@
-library(tseries)
-library(jsonlite)
-library(ggplot2)
-
 source("api_call.R")
 
 compare_process_data <-

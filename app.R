@@ -1,41 +1,59 @@
+# install.packages("shiny")
+# install.packages("ggplot2")
+# install.packages("jsonlite")
+# install.packages("tseries")
+# install.packages("httr")
+# install.packages("dotenv")
+# install.packages("shinyFeedback")
+# install.packages("thematic")
+# install.packages("magrittr")
+# install.packages("dplyr")
+
 library(shiny)
+library(ggplot2)
+library(jsonlite)
+library(tseries)
+library(httr)
+library(dotenv)
+library(shinyFeedback)
+library(thematic)
+library(magrittr)
+library(dplyr)
 
 source("api_call.R")
 source("single_analysis.R")
 source("compare_analysis.R")
 source("utils.R")
 
-common_inputs <- list(
-  dateInput(
-    inputId = "start_date",
-    label = "시작일",
-    value = Sys.Date() - 365
-  ),
-  dateInput(
-    inputId = "end_date",
-    label = "종료일",
-    value = Sys.Date()
-  ),
+keywordInput <- function(id) {
+  textInput(id, label = "키워드")
+}
+
+general_inputs <- list(
+  dateRangeInput("date_range", "기간", start = Sys.Date() - 365, end = Sys.Date()),
   selectInput(
     inputId = "time_unit",
     label = "구간 단위",
     choices = c("일간" = "date", "주간" = "week", "월간" = "month")
   ),
   textInput(
-    inputId = "group_name_single",
+    inputId = "keyword",
     label = "주제어",
-    value = "한끼통살"
+    value = "고기"
   ),
   textInput(
     inputId = "group_name_compare_1",
     label = "주제어",
-    value = "소고기"
+    value = "과일"
   ),
   textInput(
     inputId = "group_name_compare_2",
     label = "주제어",
-    value = "돼지고기"
-  ),
+    value = "수박"
+  )
+)
+
+detail_inputs <- list(
   radioButtons(
     inputId = "device",
     label = "기기",
@@ -54,39 +72,62 @@ common_inputs <- list(
     choices = c("전체", "미성년", "20대", "30대", "40대", "50대", "60대 이상"),
     selected = "전체"
   )
-  
 )
 
-ui <- fluidPage(navbarPage(
-  "분석 앱",
-  tabPanel("단일분석",
-           sidebarLayout(
-             sidebarPanel(common_inputs[-c(5,6)],
-                          actionButton(inputId = "submit", label = "입력 확인")),
-             mainPanel(plotOutput("single_plot"),
-                       textOutput("single_analysis"))
-           )),
-  tabPanel("비교분석",
-           sidebarLayout(
-             sidebarPanel(
-               common_inputs[-4],
-               actionButton(inputId = "submit_2", label = "입력 확인")
-               
-             ),
-             mainPanel(
-               plotOutput("compare_plot"),
-               plotOutput("scatter_plot"),
-               textOutput("cor")
-             )
-           ))
-))
+ui <- fluidPage(
+  theme = bslib::bs_theme(bootswatch = "minty"),
+  useShinyFeedback(),
+  titlePanel("네이버 검색어 분석기"),
+  tabsetPanel(
+    tabPanel("단일 검색어 분석",
+             sidebarLayout(
+               sidebarPanel(
+                 general_inputs[-c(4, 5)],
+                 textOutput("empty_input_warning"),
+                 textOutput("date_order_warning"),
+                 detail_inputs,
+                 actionButton(inputId = "submit", label = "입력 확인"),
+                 downloadButton("download_report"),
+                 bookmarkButton()
+               ),
+               mainPanel(plotOutput("single_plot"),
+                         textOutput("single_analysis"),)
+             ),),
+    tabPanel("비교분석",
+             sidebarLayout(
+               sidebarPanel(
+                 general_inputs[-3],
+                 detail_inputs,
+                 actionButton(inputId = "submit_2", label = "입력 확인"),
+               ),
+               mainPanel(
+                 plotOutput("compare_plot"),
+                 plotOutput("scatter_plot"),
+                 textOutput("cor")
+               )
+             )),
+  ),
+)
 
 server <- function(input, output, session) {
+  thematic::thematic_shiny()
+  
+  check_empty_input <- reactive({
+    is_empty <- input$keyword == ""
+    shinyFeedback::feedbackWarning("keyword", is_empty, "검색어를 입력해주세요.")
+  })
+  
+  validate_date_order <- reactive({
+    wrong_date_order <- input$date_range[1] > input$date_range[2]
+    shinyFeedback::feedbackWarning("date_range", wrong_date_order, "검색 시작 날짜가 더 빨라야 합니다.")
+  })
+  
+  output$empty_input_warning <- renderText(check_empty_input())
+  output$date_order_warning <- renderText(validate_date_order())
+  
   observeEvent(input$submit, {
-    params <- process_data_with_params(input)
-    
     single_analysis <-
-      single_process_data(params)
+      input %>% process_data_with_params() %>% single_process_data()
     
     output$single_analysis <- renderText({
       single_analysis$trend_analysis_result
@@ -94,8 +135,22 @@ server <- function(input, output, session) {
     output$single_plot <- renderPlot({
       single_analysis$graph
     })
-    
-    
+    output$download_report <- downloadHandler(
+      filename = "report.html",
+      content = function(file) {
+        
+        id <- showNotification(
+          "리포트 작성중...",
+          duration = NULL,
+          closeButton = FALSE
+        )
+        on.exit(removeNotification(id), add = TRUE)
+        rmarkdown::render(
+          "report.Rmd",
+          output_file = file
+        )
+      }
+    )
   })
   
   observeEvent(input$submit_2, {
@@ -115,7 +170,5 @@ server <- function(input, output, session) {
     })
   })
 }
-
-
 
 shinyApp(ui = ui, server = server)
